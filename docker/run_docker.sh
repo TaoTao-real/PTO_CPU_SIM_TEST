@@ -27,6 +27,12 @@ SAVE_CANN=0
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 CANN_PATH_FILE="$ROOT_DIR/.cann_path"
 
+if ! command -v docker >/dev/null 2>&1; then
+  echo "ERROR: docker not found in PATH" >&2
+  echo "       try: bash scripts/install_deps.sh" >&2
+  exit 2
+fi
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --cann)

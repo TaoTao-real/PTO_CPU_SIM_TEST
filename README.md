@@ -117,6 +117,10 @@ bash scripts/run_all.sh ca testcases
 Docker 镜像只安装开源工具链；CANN 目录通过 volume 挂载到容器内 `/opt/cann`。
 
 ```bash
+# （可选）首次在新机器上，先安装 Docker 依赖
+bash scripts/install_deps.sh
+
+# 构建测试环境镜像，并保存 CANN 路径
 bash scripts/deploy_test_env.sh --cann /abs/path/to/cann
 
 # 之后可直接运行（会复用 ./.cann_path，不需要再传 --cann）
