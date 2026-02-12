@@ -4,4 +4,4 @@ pto_cpu_sim
 *.so
 *.a
 build/
-
+.cann_path

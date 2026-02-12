@@ -117,5 +117,8 @@ bash scripts/run_all.sh ca testcases
 Docker 镜像只安装开源工具链；CANN 目录通过 volume 挂载到容器内 `/opt/cann`。
 
 ```bash
-bash docker/run_docker.sh --cann /abs/path/to/cann --mode ca
+bash scripts/deploy_test_env.sh --cann /abs/path/to/cann
+
+# 之后可直接运行（会复用 ./.cann_path，不需要再传 --cann）
+bash docker/run_docker.sh --mode ca
 ```
