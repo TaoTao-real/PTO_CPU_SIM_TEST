@@ -31,23 +31,68 @@ need_cmd() {
   command -v "$cmd" >/dev/null 2>&1 || die "missing command in PATH: $cmd"
 }
 
-require_sudo() {
-  if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
+is_root() {
+  [[ "${EUID:-$(id -u)}" -eq 0 ]]
+}
+
+have_sudo() {
+  command -v sudo >/dev/null 2>&1
+}
+
+run_root() {
+  if is_root; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+need_root_or_sudo() {
+  if is_root; then
     return
   fi
-  if ! command -v sudo >/dev/null 2>&1; then
-    die "need root privileges but sudo is not available"
+  if ! have_sudo; then
+    die "need root privileges but sudo is not available (re-run as root or install sudo manually)"
+  fi
+}
+
+need_apt() {
+  command -v apt-get >/dev/null 2>&1 || die "apt-get not found; this auto-installer only supports Ubuntu/Debian"
+}
+
+apt_install() {
+  need_apt
+  need_root_or_sudo
+  run_root apt-get update
+  run_root apt-get install -y --no-install-recommends "$@"
+}
+
+ensure_sudo() {
+  if is_root && ! have_sudo; then
+    note "sudo not found; installing sudo"
+    apt_install sudo
   fi
 }
 
 install_docker_debian() {
-  require_sudo
+  need_root_or_sudo
+  ensure_sudo
   note "install docker via apt (docker.io)"
-  sudo apt-get update
-  sudo apt-get install -y --no-install-recommends docker.io
+  apt_install docker.io
+
+  if ! command -v usermod >/dev/null 2>&1; then
+    note "usermod not found; installing passwd package"
+    apt_install passwd
+  fi
 
   note "enable/start docker service"
-  sudo systemctl enable --now docker || true
+  if command -v systemctl >/dev/null 2>&1; then
+    run_root systemctl enable --now docker || run_root systemctl start docker || true
+  elif command -v service >/dev/null 2>&1; then
+    run_root service docker start || true
+  else
+    note "cannot find systemctl/service; please ensure docker daemon is running"
+  fi
 }
 
 check_docker_access() {
@@ -58,11 +103,32 @@ check_docker_access() {
     return
   fi
 
-  if docker version 2>&1 | grep -qi "permission denied"; then
-    die "docker permission denied. Try: sudo usermod -aG docker $USER && newgrp docker (or re-login)"
+  local out
+  out="$(docker version 2>&1 || true)"
+
+  if echo "$out" | grep -qi "permission denied"; then
+    if ! is_root && have_sudo; then
+      note "docker permission denied; try to add user '$USER' to docker group"
+      run_root usermod -aG docker "$USER" || true
+      die "docker group updated; re-login or run: newgrp docker"
+    fi
+    die "docker permission denied (try running as root or fix docker group permissions)"
   fi
 
-  die "docker is installed but not usable. Check docker daemon/service status."
+  if echo "$out" | grep -qi "cannot connect to the docker daemon\|is the docker daemon running"; then
+    note "docker daemon not reachable; try to start service"
+    if command -v systemctl >/dev/null 2>&1; then
+      run_root systemctl start docker || true
+    elif command -v service >/dev/null 2>&1; then
+      run_root service docker start || true
+    fi
+    if docker version >/dev/null 2>&1; then
+      note "docker is ready"
+      return
+    fi
+  fi
+
+  die "docker is installed but not usable. Output:\n$out"
 }
 
 main() {
