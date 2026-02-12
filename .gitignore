@@ -1,0 +1,7 @@
+.tmp/
+pto_cpu_sim
+*.o
+*.so
+*.a
+build/
+
